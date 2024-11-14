@@ -1,47 +1,63 @@
-import pandas as pd
+import streamlit as st
+import numpy as np
+from joblib import load
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.preprocessing import LabelEncoder
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score,mean_absolute_error,mean_squared_error,f1_score,r2_score
 
-data = pd.read_csv('gym_members_exercise_tracking.csv')
+# Load the trained Random Forest model
+model = load('gr.pkl')
 
-class gym:
-    def __init__(self,data:pd.DataFrame,model):
-        self.data = data
-        self.model = model
-        
-    def preprocessing(self,x_drop_column:list,y_column:str,label_column:list):
-        label = LabelEncoder()
-        for col in label_column:
-            self.data[col] = label.fit_transform(self.data[col])
-            
-        x = self.data.drop(columns=x_drop_column)
-        y = self.data[y_column]
-        
-        X_train,X_test,Y_train,Y_test = train_test_split(x,y,test_size=0.2,random_state=42)
-        
-        return X_train,X_test,Y_train,Y_test
-        
-    def model_train(self,X_train,Y_train):
-        self.model.fit(X_train,Y_train)
-        return self.model
-        
-    def evaluate_model(self,X_test,Y_test):
-        Y_pred = self.model.predict(X_test)
-        accuracy = r2_score(Y_test,Y_pred)
-        
-        print(f"Your Model Accuracy : {round(accuracy*100,2)}")
+# Streamlit App Title with Emoji
+st.title("Gym Member Exercise Tracker - Calories Burned Predictor")
 
-if __name__ == "__main__":
+
+# Collect User Inputs for Prediction
+st.header("Enter Your Exercise Details:")
+age = st.number_input("Age (in years)", min_value=10, max_value=100, value=25)
+gender = st.selectbox("Gender", ("Male", "Female"))
+weight = st.number_input("Weight (kg)", min_value=30.0, max_value=200.0, value=70.0)
+height = st.number_input("Height (m)", min_value=1.0, max_value=2.5, value=1.7)
+max_bpm = st.number_input("Max BPM", min_value=100, max_value=220, value=180)
+avg_bpm = st.number_input("Avg BPM", min_value=50, max_value=200, value=130)
+resting_bpm = st.number_input("Resting BPM", min_value=40, max_value=100, value=60)
+session_duration = st.number_input("Session Duration (hours)", min_value=0.1, max_value=5.0, value=1.0)
+workout_type = st.selectbox("Workout Type", ("Yoga", "HIIT", "Cardio", "Strength"))
+fat_percentage = st.number_input("Fat Percentage", min_value=5.0, max_value=50.0, value=20.0)
+water_intake = st.number_input("Water Intake (liters)", min_value=0.5, max_value=5.0, value=2.0)
+workout_frequency = st.number_input("Workout Frequency (days/week)", min_value=1, max_value=7, value=3)
+experience_level = st.selectbox("Experience Level", ("1", "2", "3"))
+bmi = st.number_input("BMI", min_value=10.0, max_value=50.0, value=25.0)
+
+# Encode categorical inputs
+gender = 1 if gender == "Male" else 0
+workout_type_map = {"Yoga": 0, "HIIT": 1, "Cardio": 2, "Strength": 3}
+workout_type = workout_type_map[workout_type]
+experience_level = int(experience_level)
+
+# Prepare input data for prediction
+input_data = np.array([[age, gender, weight, height, max_bpm, avg_bpm, resting_bpm, session_duration,
+                        workout_type, fat_percentage, water_intake, workout_frequency, experience_level, bmi]])
+
+# Button for making prediction
+if st.button("Predict Calories Burned"):
+    prediction = model.predict(input_data)
     
-    gym1 = gym(data,LinearRegression())
+    # Displaying result in a unique way
+    st.markdown(f"### 🔥 Predicted Calories Burned: **{prediction[0]:.2f} kcal**")
     
-    x_drop_column = ['Age','Max_BPM','Avg_BPM','Resting_BPM','Workout_Type','BMI']
-    X_train,X_test,Y_train,Y_test = gym1.preprocessing(x_drop_column,'BMI',['Gender'])
+    # Create a simple bar chart visualizing input parameters and their effects on calories burned
+    feature_names = ['Age', 'Weight', 'Height', 'Max BPM', 'Avg BPM', 'Session Duration']
+    feature_values = [age, weight, height, max_bpm, avg_bpm, session_duration]
     
-    gym1.model_train(X_train,Y_train)
+    # Plotting
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.barh(feature_names, feature_values, color='skyblue')
+    ax.set_xlabel("Values")
+    ax.set_title("Feature Impact on Calories Burned Prediction")
     
-    gym1.evaluate_model(X_test,Y_test)
+    st.pyplot(fig)
+
+    # Bonus: Suggest improvements for users
+    if prediction[0] > 500:
+        st.success("Great workout! You're burning a lot of calories!")
+    else:
+        st.info("Keep pushing! Try increasing your workout intensity to burn more calories.")
